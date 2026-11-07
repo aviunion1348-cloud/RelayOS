@@ -13,3 +13,5 @@ Dependency checkpoint: task graph creation, cycle prevention and completion prer
 Task ownership checkpoint: nullable owner/reviewer fields, same-organization validation and audit are implemented and API-tested. The interim admin-only guard remains in force. Concurrent edit protection, project membership, and user lifecycle still need implementation.
 
 Task status and owner/reviewer updates now use optimistic versions; stale and concurrent write tests passed on isolated PostgreSQL. Existing API clients must send the version. Continue with QA and evidence-based handover; the full workflow is not implemented.
+
+QA checkpoint: structured cases and immutable-through-API execution history added, tested against PostgreSQL. Continue with true evidence storage, QA review, versioned policy and non-bypassable handover, followed by the remaining release scope. The 3,500 source threshold remains unapproved and unfulfilled.

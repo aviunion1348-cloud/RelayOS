@@ -37,7 +37,7 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   assert.equal((await req('/milestones','POST',{projectId:project.id,title:'Cross tenant'},b)).status,400);
   const other=await req('/projects','POST',{name:'Other',client:'Test'},a);const otherProject=await other.json() as {id:string};
   assert.equal((await req('/modules','POST',{projectId:otherProject.id,milestoneId:milestone.id,title:'Wrong project'},a)).status,400);
-  const module=await req('/modules','POST',{projectId:project.id,milestoneId:milestone.id,title:'Module 1'},a);assert.equal(module.status,201);
+  const module=await req('/modules','POST',{projectId:project.id,milestoneId:milestone.id,title:'Module 1'},a);assert.equal(module.status,201);const moduleRecord=await module.json() as {id:string};
   await assert.rejects(pool.query('INSERT INTO delivery_modules(id,organization_id,project_id,milestone_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[randomUUID(),orgA,otherProject.id,milestone.id,'Invalid milestone',userA]),(e:any)=>e.code==='23503');
   assert.equal(((await (await req('/milestones','GET',undefined,b)).json()) as unknown[]).length,0);assert.equal(((await (await req('/modules','GET',undefined,b)).json()) as unknown[]).length,0);
   const taskRes=await req('/tasks','POST',{title:'A task',projectId:project.id,priority:'High'},a);assert.equal(taskRes.status,201);const task=await taskRes.json() as {id:string};
@@ -54,6 +54,14 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   await assert.rejects(pool.query('INSERT INTO tasks(id,organization_id,project_id,title) VALUES($1,$2,$3,$4)',[randomUUID(),orgB,project.id,'Invalid cross-tenant FK']), (e: any)=>e.code==='23503');
   const stored=await pool.query('SELECT status FROM tasks WHERE id=$1 AND organization_id=$2',[task.id,orgA]);assert.equal(stored.rows[0].status,'Done');
   const audit=await pool.query('SELECT action FROM audits WHERE organization_id=$1 ORDER BY created_at',[orgA]);assert.deepEqual(audit.rows.map(r=>r.action),['project.created','milestone.created','project.created','module.created','task.created','task.status.Done','task.assignment.updated']);
+  const qaCase={projectId:project.id,moduleId:moduleRecord.id,title:'Authorization boundary',category:'Security',risk:'Exposure',preconditions:'Two organizations',input:'Request record',expectedResult:'Access denied'};
+  assert.equal((await req('/qa/cases','POST',qaCase,b)).status,400);
+  const qa=await req('/qa/cases','POST',qaCase,a);assert.equal(qa.status,201);const caseRecord=await qa.json() as {id:string};
+  assert.equal((await req('/qa/cases','POST',{...qaCase,title:' authorization boundary '},a)).status,409);
+  const result={caseId:caseRecord.id,outcome:'Pass',actualResult:'Request denied',evidenceReference:'Manual test reference',buildVersion:'test-build',environment:'isolated test'};
+  assert.equal((await req('/qa/results','POST',result,b)).status,400);
+  assert.equal((await req('/qa/results','POST',result,a)).status,201);assert.equal((await req('/qa/results','POST',{...result,outcome:'Fail',actualResult:'Regression'},a)).status,201);
+  assert.equal(((await (await req('/qa/results','GET',undefined,a)).json()) as unknown[]).length,2);assert.equal(((await (await req('/qa/results','GET',undefined,b)).json()) as unknown[]).length,0);
   const preResponse=await req('/tasks','POST',{title:'Prerequisite',projectId:project.id,priority:'Medium'},a);const pre=await preResponse.json() as {id:string};
   const dependentResponse=await req('/tasks','POST',{title:'Dependent',projectId:project.id,priority:'Medium'},a);const dependent=await dependentResponse.json() as {id:string};
   assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},a)).status,201);

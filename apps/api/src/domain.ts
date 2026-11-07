@@ -10,3 +10,6 @@ export const milestoneSchema = z.object({projectId:z.string().min(1).max(100),ti
 export const deliveryModuleSchema = milestoneSchema.extend({milestoneId:z.string().max(100).optional().transform(v=>v || null)}).strict();
 export const dependencySchema = z.object({dependsOnId:z.string().min(1).max(100)}).strict();
 export const assignmentSchema = z.object({ownerId:z.string().max(100).nullable(),reviewerId:z.string().max(100).nullable(),version:z.number().int().nonnegative()}).strict();
+const requiredDetail = z.string().trim().min(1).max(4000);
+export const qaCaseSchema = z.object({projectId:z.string().min(1).max(100),moduleId:z.string().min(1).max(100),requirementId:z.string().max(100).optional().transform(v=>v||null),title:z.string().trim().min(1).max(160),category:z.string().trim().min(1).max(120),risk:requiredDetail,preconditions:requiredDetail,input:requiredDetail,expectedResult:requiredDetail}).strict();
+export const qaResultSchema = z.object({caseId:z.string().min(1).max(100),outcome:z.enum(['Pass','Fail','Blocked','Not run','Skipped']),actualResult:requiredDetail,evidenceReference:z.string().trim().max(1000).default(''),buildVersion:z.string().trim().min(1).max(120),environment:z.string().trim().min(1).max(120)}).strict();

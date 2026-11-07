@@ -1,0 +1,7 @@
+# QA case and result checkpoint — 2026-11-08
+
+Migration 008 adds structured cases linked to modules and optional requirements, and append-only-through-API result records with outcome, actual result, build, environment, tester, timestamp and an optional evidence reference. Cases have category, risk, preconditions, input and expected result. API checks organization/project/module membership; duplicate case titles within a module are rejected. The UI allows case/result entry and history display. A URL or other reference is not verified evidence. The backend role is not yet constrained to append-only database privileges.
+
+Evidence: on isolated PostgreSQL 18.6, migration upgrade test and API integration test passed, including cross-organization denials, duplicate normalized title rejection, two retained results for one case, and organization-scoped result listing. Typecheck, three unit tests and build passed. Browser/keyboard/accessibility/anti-slop checks remain NOT TESTED. This is not the complete QA engine: suites, defect linking, QA report, approval/review, coverage, robust deduplication and test-execution evidence validation are not implemented. Optional requirements are only organization-scoped: project-specific requirement ownership is not yet modeled.
+
+The source 3,500 threshold has not been met or counted. Distinct titles alone do not prove meaningful unique edge cases. Owner approval of scope/counting rules is pending; no synthetic case catalogue or fake execution results were created.
