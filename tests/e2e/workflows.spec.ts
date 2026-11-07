@@ -1,0 +1,62 @@
+import { test, expect, type Page } from '@playwright/test';
+import { Pool } from 'pg';
+import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
+
+const url = process.env.TEST_DATABASE_URL;
+if (!url || process.env.RELAYOS_DISPOSABLE_TEST_DB !== 'yes') throw new Error('Use a migrated, disposable TEST_DATABASE_URL');
+const pool = new Pool({connectionString:url});
+const password='Local-browser-test-only-123';
+let user: {id:string; org:string; email:string};
+
+test.beforeEach(async()=>{
+ const id=randomUUID(),org=randomUUID(),email=`e2e-${randomUUID()}@example.test`,salt=randomBytes(16).toString('hex');
+ const hash=`${salt}:${scryptSync(password,salt,64).toString('hex')}`;
+ await pool.query('INSERT INTO organizations(id,name) VALUES($1,$2)',[org,'E2E synthetic workspace']);
+ await pool.query('INSERT INTO users(id,email,password_hash,organization_id) VALUES($1,$2,$3,$4)',[id,email,hash,org]);
+ user={id,org,email};
+});
+test.afterAll(async()=>{await pool.end();});
+async function login(page:Page){await page.goto('/');await page.getByLabel('Email').fill(user.email);await page.getByLabel('Password').fill(password);await page.getByRole('button',{name:/Sign in/}).click();await expect(page.getByRole('heading',{name:'The big picture.'})).toBeVisible();}
+async function open(page:Page,name:string){await page.getByRole('navigation').getByRole('button',{name:new RegExp(name)}).click();}
+async function save(page:Page,name:string){await page.getByRole('button',{name:`Save ${name}`}).click();await expect(page.getByRole('dialog')).toHaveCount(0);}
+async function addProject(page:Page){await page.getByRole('button',{name:/New project/}).first().click();await page.getByLabel('Project name').fill('E2E Project');await page.getByLabel('Client',{exact:true}).fill('E2E Client');await save(page,'project');await expect.poll(async()=>(await pool.query('SELECT count(*)::int AS n FROM projects WHERE organization_id=$1',[user.org])).rows[0].n).toBe(1);}
+async function addTask(page:Page,title:string){await page.getByRole('button',{name:/Add task/}).click();await page.getByLabel('Task title').fill(title);await page.locator('select[name=projectId]').selectOption({label:'E2E Project'});await save(page,'task');await expect(page.getByText(title,{exact:true})).toBeVisible();}
+
+test('client discovery through planning, task dependencies, assignment and QA persists in PostgreSQL',async({page})=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await login(page);
+ await page.getByRole('button',{name:/Add prospect/}).first().click();await page.getByLabel('Name',{exact:true}).fill('E2E Contact');await page.getByLabel('Company',{exact:true}).fill('E2E Client');await page.getByLabel('Email',{exact:true}).fill('client@example.test');await save(page,'prospect');
+ await open(page,'Consultations');await page.getByRole('button',{name:/Record consultation/}).first().click();await page.locator('select[name=prospectId]').selectOption({label:'E2E Client · E2E Contact'});await page.getByLabel('Meeting title').fill('Technical discovery');await page.getByLabel('Infrastructure',{exact:true}).fill('Synthetic environment');await page.getByLabel('Business requirements',{exact:true}).fill('Improve delivery visibility');await save(page,'consultation');await expect(page.getByText('Technical discovery',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:/Add requirement/}).click();await page.locator('select[name=consultationId]').selectOption({label:'Technical discovery'});await page.getByLabel('Requirement title').fill('Delivery visibility');await page.getByLabel('Description',{exact:true}).fill('Track delivery progress');await save(page,'requirement');await expect(page.getByText('Delivery visibility',{exact:true})).toBeVisible();
+ await addProject(page);await open(page,'Planning');await page.getByRole('button',{name:/Add milestone/}).click();await page.locator('select[name=projectId]').selectOption({label:'E2E Project'});await page.getByLabel('Title',{exact:true}).fill('First delivery');await save(page,'milestone');await expect(page.getByText('First delivery',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:/Add module/}).click();await page.locator('select[name=projectId]').selectOption({label:'E2E Project'});await page.getByLabel('Title',{exact:true}).fill('Core module');await page.locator('select[name=milestoneId]').selectOption({label:'E2E Project · First delivery'});await save(page,'module');await expect(page.getByText('Core module',{exact:true})).toBeVisible();
+ await open(page,'Work board');await addTask(page,'Prerequisite');await addTask(page,'Dependent');await page.getByRole('button',{name:'Link dependency'}).click();await page.locator('select[name=taskId]').selectOption({label:'E2E Project · Dependent'});await page.locator('select[name=dependsOnId]').selectOption({label:'E2E Project · Prerequisite'});await save(page,'dependency');await expect(page.getByText('Dependent depends on Prerequisite')).toBeVisible();
+ await page.getByLabel('Status for Dependent').selectOption('Done');await expect(page.locator('p[role=alert]')).toContainText('Complete prerequisite tasks');await page.getByLabel('Status for Prerequisite').selectOption('Done');await expect(page.getByLabel('Status for Prerequisite')).toHaveValue('Done');await page.getByLabel('Status for Dependent').selectOption('Done');await expect(page.getByLabel('Status for Dependent')).toHaveValue('Done');
+ await page.getByRole('button',{name:'Assign task'}).click();await page.locator('select[name=taskId]').selectOption({label:'Dependent'});await page.locator('select[name=ownerId]').selectOption({label:user.email});await save(page,'assignment');await expect(page.getByText(`Dependent · Owner: ${user.email} · Reviewer: Unassigned`)).toBeVisible();
+ await open(page,'QA');await page.getByRole('button',{name:/Add test case/}).click();await page.locator('select[name=projectId]').selectOption({label:'E2E Project'});await page.locator('select[name=moduleId]').selectOption({label:'E2E Project · Core module'});await page.locator('select[name=requirementId]').selectOption({label:'Delivery visibility'});await page.getByLabel('Title',{exact:true}).fill('Access boundary');await page.getByLabel('Category',{exact:true}).fill('Security');await page.getByLabel('Risk',{exact:true}).fill('Unauthorized access');await page.getByLabel('Preconditions',{exact:true}).fill('Two organizations');await page.getByLabel('Input or trigger').fill('Attempt access');await page.getByLabel('Expected result',{exact:true}).fill('Request denied');await save(page,'qacase');await expect(page.getByText('Access boundary',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:/Record result/}).click();await page.locator('select[name=caseId]').selectOption({label:'Access boundary'});await page.locator('select[name=outcome]').selectOption('Pass');await page.getByLabel('Actual result').fill('Denied in synthetic run');await page.getByLabel('Build version').fill('e2e-build');await page.getByLabel('Environment',{exact:true}).fill('isolated');await page.getByLabel('Evidence reference (optional)').fill('Synthetic record only');await save(page,'qaresult');await expect(page.getByText('Access boundary · Pass')).toBeVisible();
+ await page.reload();await open(page,'QA');await expect(page.getByText('Access boundary · Pass')).toBeVisible();
+ const record=await pool.query('SELECT q.outcome,q.actual_result,t.owner_id FROM qa_results q JOIN qa_cases c ON q.case_id=c.id JOIN tasks t ON t.organization_id=q.organization_id AND t.title=$2 WHERE q.organization_id=$1',[user.org,'Dependent']);expect(record.rows).toHaveLength(1);expect(record.rows[0]).toMatchObject({outcome:'Pass',actual_result:'Denied in synthetic run',owner_id:user.id});expect(errors).toEqual([]);
+});
+
+test('stale edits in another tab show a conflict and do not overwrite the committed task',async({page,context})=>{
+ await login(page);await addProject(page);await open(page,'Work board');await addTask(page,'Concurrent task');
+ const other=await context.newPage();await other.goto('/');await open(other,'Work board');await expect(other.getByLabel('Status for Concurrent task')).toHaveValue('To do');
+ await page.getByLabel('Status for Concurrent task').selectOption('In progress');await expect(page.getByLabel('Status for Concurrent task')).toHaveValue('In progress');
+ await other.getByLabel('Status for Concurrent task').selectOption('Blocked');await expect(other.locator('p[role=alert]')).toContainText('Task changed; refresh and try again');
+ const stored=await pool.query('SELECT status FROM tasks WHERE organization_id=$1 AND title=$2',[user.org,'Concurrent task']);expect(stored.rows[0].status).toBe('In progress');
+});
+
+test('mobile navigation and keyboard can reach the work board and close a dialog',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await login(page);await open(page,'Work board');await expect(page.getByRole('heading',{name:'All tasks'})).toBeVisible();await page.getByRole('button',{name:/Add task/}).focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();await expect(page.getByRole('button',{name:'Close'})).toBeFocused();await page.keyboard.press('Shift+Tab');await expect(page.getByRole('button',{name:'Cancel'})).toBeFocused();await page.keyboard.press('Tab');await expect(page.getByRole('button',{name:'Close'})).toBeFocused();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByRole('button',{name:/Add task/})).toBeFocused();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();await page.getByRole('button',{name:'Sign out'}).click();await expect(page.getByRole('heading',{name:'Welcome back.'})).toBeVisible();
+});
+
+test('automated accessibility scan of login and mobile work board',async({page})=>{
+ const {default:AxeBuilder}=await import('@axe-core/playwright');
+ await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Welcome back.'})).toBeVisible();
+ const loginResults=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+ expect(loginResults.violations.map(v=>`${v.id}: ${v.nodes.map(n=>`${n.target.join(' ')} ${n.failureSummary}`).join(' | ')}`)).toEqual([]);
+ await page.getByLabel('Email').fill(user.email);await page.getByLabel('Password').fill(password);await page.getByRole('button',{name:/Sign in/}).click();await expect(page.getByRole('heading',{name:'The big picture.'})).toBeVisible();await open(page,'Work board');
+ const boardResults=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
+ expect(boardResults.violations.map(v=>`${v.id}: ${v.nodes.map(n=>`${n.target.join(' ')} ${n.failureSummary}`).join(' | ')}`)).toEqual([]);
+});
