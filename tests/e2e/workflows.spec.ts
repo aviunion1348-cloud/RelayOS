@@ -43,7 +43,7 @@ test('stale edits in another tab show a conflict and do not overwrite the commit
  const other=await context.newPage();await other.goto('/');await open(other,'Work board');await expect(other.getByLabel('Status for Concurrent task')).toHaveValue('To do');
  await page.getByLabel('Status for Concurrent task').selectOption('In progress');await expect(page.getByLabel('Status for Concurrent task')).toHaveValue('In progress');
  await other.getByLabel('Status for Concurrent task').selectOption('Blocked');await expect(other.locator('p[role=alert]')).toContainText('Task changed; refresh and try again');
- const stored=await pool.query('SELECT status FROM tasks WHERE organization_id=$1 AND title=$2',[user.org,'Concurrent task']);expect(stored.rows[0].status).toBe('In progress');
+ const stored=await pool.query('SELECT status FROM tasks WHERE organization_id=$1 AND title=$2',[user.org,'Concurrent task']);expect(stored.rows[0].status).toBe('In progress');await other.getByRole('button',{name:'Refresh task data'}).click();await expect(other.getByLabel('Status for Concurrent task')).toHaveValue('In progress');await other.getByLabel('Status for Concurrent task').selectOption('Blocked');await expect(other.getByLabel('Status for Concurrent task')).toHaveValue('Blocked');const updated=await pool.query('SELECT status FROM tasks WHERE organization_id=$1 AND title=$2',[user.org,'Concurrent task']);expect(updated.rows[0].status).toBe('Blocked');
 });
 
 test('mobile navigation and keyboard can reach the work board and close a dialog',async({page})=>{
@@ -59,4 +59,14 @@ test('automated accessibility scan of login and mobile work board',async({page})
  await page.getByLabel('Email').fill(user.email);await page.getByLabel('Password').fill(password);await page.getByRole('button',{name:/Sign in/}).click();await expect(page.getByRole('heading',{name:'The big picture.'})).toBeVisible();await open(page,'Work board');
  const boardResults=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
  expect(boardResults.violations.map(v=>`${v.id}: ${v.nodes.map(n=>`${n.target.join(' ')} ${n.failureSummary}`).join(' | ')}`)).toEqual([]);
+});
+
+test('assignment conflict requires refresh and review before retry',async({page,context})=>{
+ await login(page);await addProject(page);await open(page,'Work board');await addTask(page,'Assignment conflict');
+ const other=await context.newPage();await other.goto('/');await open(other,'Work board');
+ await other.getByRole('button',{name:'Assign task'}).click();await other.locator('select[name=taskId]').selectOption({label:'Assignment conflict'});await other.locator('select[name=ownerId]').selectOption({label:user.email});
+ await page.getByRole('button',{name:'Assign task'}).click();await page.locator('select[name=taskId]').selectOption({label:'Assignment conflict'});await page.locator('select[name=reviewerId]').selectOption({label:user.email});await save(page,'assignment');
+ await other.getByRole('button',{name:'Save assignment'}).click();await expect(other.locator('p[role=alert]')).toContainText('Task changed');await expect(other.getByRole('button',{name:'Save assignment'})).toBeDisabled();
+ await other.getByRole('button',{name:'Refresh task data'}).click();await expect(other.locator('select[name=taskId]')).toHaveValue('');await other.locator('select[name=taskId]').selectOption({label:'Assignment conflict'});await expect(other.locator('select[name=reviewerId]')).toHaveValue(user.id);await other.locator('select[name=ownerId]').selectOption(user.id);await save(other,'assignment');
+ const saved=await pool.query('SELECT owner_id,reviewer_id FROM tasks WHERE organization_id=$1 AND title=$2',[user.org,'Assignment conflict']);expect(saved.rows[0]).toMatchObject({owner_id:user.id,reviewer_id:user.id});
 });
