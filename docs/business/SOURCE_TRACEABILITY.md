@@ -12,3 +12,4 @@ The uploaded master directive is preserved verbatim in `MASTER_DIRECTIVE.md`. Th
 | Master directive, QA | 3,500 distinct edge cases, owner-defined scope | `EDGE_CASE_CATALOG_POLICY.md` | Taxonomy documented; catalogue and execution not implemented |
 | Master directive stages 2 and 4 | Capture initial and technical consultation discussion | `consultations` PostgreSQL records, API, Consultations screen | API integration tests passed; UI browser verification pending |
 | Master directive requirements | Draft requirements linked to consultation | `requirements` table, API, Consultations screen | API persistence and isolation tested; approvals/baselining not implemented |
+| Master directive stages 7–8 | Break project scope into modules and milestones | `milestones`, `delivery_modules`, API, Planning screen | API and PostgreSQL relationship tests passed; UI verification and broader planning remain pending |
