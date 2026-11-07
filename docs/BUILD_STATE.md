@@ -11,3 +11,5 @@ Planning checkpoint: project-linked milestones and modules added with API/databa
 Dependency checkpoint: task graph creation, cycle prevention and completion prerequisites were implemented and tested; see `docs/quality/CHECKPOINT_DEPENDENCIES.md`. The next implementation priority is task ownership, assignment and dependencies management, then SLA/QA/handover. The full directive and Release 1 remain unfinished.
 
 Task ownership checkpoint: nullable owner/reviewer fields, same-organization validation and audit are implemented and API-tested. The interim admin-only guard remains in force. Concurrent edit protection, project membership, and user lifecycle still need implementation.
+
+Task status and owner/reviewer updates now use optimistic versions; stale and concurrent write tests passed on isolated PostgreSQL. Existing API clients must send the version. Continue with QA and evidence-based handover; the full workflow is not implemented.

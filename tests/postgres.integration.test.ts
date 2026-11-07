@@ -41,10 +41,12 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   await assert.rejects(pool.query('INSERT INTO delivery_modules(id,organization_id,project_id,milestone_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[randomUUID(),orgA,otherProject.id,milestone.id,'Invalid milestone',userA]),(e:any)=>e.code==='23503');
   assert.equal(((await (await req('/milestones','GET',undefined,b)).json()) as unknown[]).length,0);assert.equal(((await (await req('/modules','GET',undefined,b)).json()) as unknown[]).length,0);
   const taskRes=await req('/tasks','POST',{title:'A task',projectId:project.id,priority:'High'},a);assert.equal(taskRes.status,201);const task=await taskRes.json() as {id:string};
-  assert.equal((await req('/tasks/'+task.id,'PATCH',{status:'Done'},b)).status,400);
-  assert.equal((await req('/tasks/'+task.id,'PATCH',{status:'Done'},a)).status,200);
-  assert.equal((await req('/tasks/'+task.id+'/assignment','PATCH',{ownerId:userB,reviewerId:null},a)).status,400);
-  assert.equal((await req('/tasks/'+task.id+'/assignment','PATCH',{ownerId:userA,reviewerId:viewer},a)).status,200);
+  assert.equal((await req('/tasks/'+task.id,'PATCH',{status:'Done',version:0},b)).status,400);
+  assert.equal((await req('/tasks/'+task.id,'PATCH',{status:'Done',version:0},a)).status,200);
+  assert.equal((await req('/tasks/'+task.id+'/assignment','PATCH',{ownerId:userB,reviewerId:null,version:1},a)).status,400);
+  assert.equal((await req('/tasks/'+task.id+'/assignment','PATCH',{ownerId:userA,reviewerId:viewer,version:1},a)).status,200);
+  assert.equal((await req('/tasks/'+task.id+'/assignment','PATCH',{ownerId:null,reviewerId:null,version:1},a)).status,409);
+  assert.equal((await req('/tasks/'+task.id,'PATCH',{status:'Done',version:1},a)).status,409);
   await assert.rejects(pool.query('UPDATE tasks SET owner_id=$1 WHERE id=$2',[userB,task.id]),(e:any)=>e.code==='23503');
   const assignment=await pool.query('SELECT owner_id,reviewer_id FROM tasks WHERE id=$1',[task.id]);assert.equal(assignment.rows[0].owner_id,userA);assert.equal(assignment.rows[0].reviewer_id,viewer);
 
@@ -57,11 +59,14 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},a)).status,201);
   assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},a)).status,409);
   assert.equal((await req('/tasks/'+pre.id+'/dependencies','POST',{dependsOnId:dependent.id},a)).status,400);
-  assert.equal((await req('/tasks/'+dependent.id,'PATCH',{status:'Done'},a)).status,400);
-  assert.equal((await req('/tasks/'+pre.id,'PATCH',{status:'Done'},a)).status,200);
-  assert.equal((await req('/tasks/'+dependent.id,'PATCH',{status:'Done'},a)).status,200);
-  assert.equal((await req('/tasks/'+pre.id,'PATCH',{status:'In progress'},a)).status,400);
+  assert.equal((await req('/tasks/'+dependent.id,'PATCH',{status:'Done',version:0},a)).status,400);
+  assert.equal((await req('/tasks/'+pre.id,'PATCH',{status:'Done',version:0},a)).status,200);
+  assert.equal((await req('/tasks/'+dependent.id,'PATCH',{status:'Done',version:0},a)).status,200);
+  assert.equal((await req('/tasks/'+pre.id,'PATCH',{status:'In progress',version:1},a)).status,400);
   assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},b)).status,400);
+  const concurrentTask=await (await req('/tasks','POST',{title:'Concurrent edits',projectId:project.id,priority:'Medium'},a)).json() as {id:string};
+  const edits=await Promise.all([req('/tasks/'+concurrentTask.id+'/assignment','PATCH',{ownerId:userA,reviewerId:null,version:0},a),req('/tasks/'+concurrentTask.id+'/assignment','PATCH',{ownerId:viewer,reviewerId:null,version:0},a)]);
+  assert.deepEqual(edits.map(r=>r.status).sort(),[200,409]);
   const x=await (await req('/tasks','POST',{title:'Concurrent X',projectId:project.id,priority:'Medium'},a)).json() as {id:string};
   const y=await (await req('/tasks','POST',{title:'Concurrent Y',projectId:project.id,priority:'Medium'},a)).json() as {id:string};
   const concurrent=await Promise.all([req('/tasks/'+x.id+'/dependencies','POST',{dependsOnId:y.id},a),req('/tasks/'+y.id+'/dependencies','POST',{dependsOnId:x.id},a)]);

@@ -1,0 +1,5 @@
+# Task concurrency checkpoint — 2026-11-08
+
+Additive migration 007 introduces a version number on existing task records. Status and assignment updates require the last observed version; a successful write increments it and a stale write returns HTTP 409 without recording a successful audit event. Existing tasks get version 0. The current work board sends the version and reports errors; browser behavior is not verified. This is a breaking API contract for callers of the prior status/assignment endpoints, which must now submit `version`.
+
+Evidence on isolated PostgreSQL 18.6: `npm run test:integration` passed both tests, including upgrade from 001, stale status and assignment rejection, and concurrent assignment attempts where exactly one succeeds. `npm run typecheck`, `npm test` and `npm run build` passed during this checkpoint. These checks do not prove concurrency safety for other entities, all isolation levels, failures or external database writers. UI conflict recovery, keyboard/accessibility and anti-slop gate remain NOT TESTED.
