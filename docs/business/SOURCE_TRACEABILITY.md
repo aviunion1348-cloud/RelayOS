@@ -7,3 +7,6 @@ The uploaded master directive is preserved verbatim in `MASTER_DIRECTIVE.md`. Th
 | Master directive, stage 1 | Prospect registration and duplicate prevention | API prospect endpoint and database uniqueness | Input normalization unit test only; DB behavior pending |
 | Master directive, stages 7–8 | Project and task organization | Project/task API and workspace | Unit input tests only; integration pending |
 | Master directive, audit requirement | Audit records | Transactional API writes | Database verification pending |
+| Master directive, authentication | Secure sessions and revocation | `user_sessions`, login/logout/identity | Targeted logout and reuse integration test; full session management pending |
+| Master directive, database | PostgreSQL persistence, migration safety, isolation | SQL migrations, migration runner and API | Isolated PostgreSQL tests; comprehensive isolation and production roles pending |
+| Master directive, QA | 3,500 distinct edge cases, owner-defined scope | `EDGE_CASE_CATALOG_POLICY.md` | Taxonomy documented; catalogue and execution not implemented |

@@ -1,8 +1,8 @@
 # Blockers and release risks
 
-- The referenced 323-element Excalidraw export was not attached. Element-level extraction, traceability and interpretation cannot be completed without it.
-- No Docker or PostgreSQL executables were available in this sandbox. Migration, persistence, authorization, cross-tenant and E2E behavior have not been exercised against a database.
-- The demo recording and final architecture/security/release gates are not complete. No video has been fabricated.
-- The local Compose user owns the database. Separate runtime/migration/backup roles, least privilege, backups and production configuration are not implemented.
-- Authentication lacks rate limits, granular permissions, server-side session revocation, MFA and production account lifecycle. Do not expose this application publicly or use sensitive data.
-- CI is partial; full required mandatory checks are not yet in place. No production deployment or branch protection was changed.
+- The Markdown is actionable for implementation. The original 323-element Excalidraw export is not attached; element IDs and ordinals cannot be independently reconstructed.
+- Docker and PostgreSQL executables are not installed globally. A disposable PostgreSQL 18.6 instance was obtained for targeted local tests; Compose/PostgreSQL 16 and actual GitHub CI runs remain unverified.
+- No browser-backed end-to-end test or final demonstration recording has been produced. A full production release remains blocked by missing lifecycle functionality and release-gate evidence.
+- The local Compose database user owns the database. Separate runtime/migration/backup roles, least privilege, backups and production configuration are not implemented.
+- Authentication lacks rate limiting, granular permissions, MFA, Argon2id, password recovery, full session administration and production account lifecycle. Logout now revokes its current session, but that alone is not production identity management. Do not expose this application publicly or use sensitive data.
+- CI is partial; full mandatory checks, protected branch configuration and production release approvals are not in place. No production deployment or repository permission change was made.
