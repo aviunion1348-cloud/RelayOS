@@ -15,3 +15,5 @@ Task ownership checkpoint: nullable owner/reviewer fields, same-organization val
 Task status and owner/reviewer updates now use optimistic versions; stale and concurrent write tests passed on isolated PostgreSQL. Existing API clients must send the version. Continue with QA and evidence-based handover; the full workflow is not implemented.
 
 QA checkpoint: structured cases and immutable-through-API execution history added, tested against PostgreSQL. Continue with true evidence storage, QA review, versioned policy and non-bypassable handover, followed by the remaining release scope. The 3,500 source threshold remains unapproved and unfulfilled.
+
+Execution handoff: `docs/HANDOFF.md` records the last verified implementation commit, exact next task, unresolved gates and testing environment. The inventory at `docs/manager/DIRECTIVE_SOURCE_INVENTORY.csv` preserves source lines but is not yet a classified requirement ledger or feature atlas.

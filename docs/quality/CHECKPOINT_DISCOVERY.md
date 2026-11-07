@@ -15,3 +15,5 @@ The previous API integration test remains limited and does not establish product
 ## Follow-on authorization hardening
 
 An interim fail-closed rule now denies all protected business endpoints to non-`admin` roles. PostgreSQL integration tests exercised a viewer's denied overview, project creation and consultation access, alongside normal admin behavior. This deliberately restricts non-admin users until real role and resource policies exist; it is not the requested RBAC/ABAC system and does not provide project-level or RLS isolation. Login itself remains available, and logout remains available to revoke a session.
+
+An additional local HTTP smoke check through the actual Next.js proxy logged in with an isolated synthetic account, created a prospect and consultation, and retrieved the persisted consultation (201/201/200). This did not run a browser or verify the interface.
