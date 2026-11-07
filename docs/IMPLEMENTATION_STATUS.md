@@ -19,3 +19,4 @@ Release 2 and Release 3 remain unimplemented. The 3,500 edge-case catalogue requ
 
 ### Discovery checkpoint
 - Consultation and draft requirement creation/listing are implemented. PostgreSQL-backed API persistence and targeted cross-organization denial tests passed. The UI builds but is **not browser verified**; browser launch failed due to missing NSS/NSPR libraries. Details and omissions: `docs/quality/CHECKPOINT_DISCOVERY.md`.
+- Interim fail-closed guard: only `admin` users may use business endpoints; targeted integration tests verify non-admin denial. This is deliberately restrictive, **not** complete role-based or project-level authorization.

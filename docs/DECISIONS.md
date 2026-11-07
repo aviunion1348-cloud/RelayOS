@@ -13,3 +13,4 @@
 - This branch is the dedicated session branch. Protect existing data; no production deployment or permission change.
 - Use opaque, cryptographically random session tokens with hashes stored in PostgreSQL instead of signed self-contained JWTs for new local sessions; logout can revoke the current session. Existing JWT cookies become invalid and users must sign in again. Full session management is still pending.
 - For local integration checks, use a disposable loopback PostgreSQL instance rather than substituting SQLite or a file. PostgreSQL 18.6 was available from an npm binary package; Compose/CI still specify PostgreSQL 16.
+- 2026-11-08: Deny non-admin roles access to current business endpoints until resource-level RBAC/ABAC is implemented; do not give all organization members full visibility by default. This is an interim restriction, not an approved organizational policy.

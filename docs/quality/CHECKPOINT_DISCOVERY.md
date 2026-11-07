@@ -11,3 +11,7 @@ Additive migration 003 introduces structured consultation records tied to prospe
 - The actual upstream Anti-Slop files were inspected at commit 9504989f162a92b1996853eccbb3d8a86e73df68; project-local rules and selected skills copied with license. See `docs/quality/antislop/SETUP.md`.
 
 The previous API integration test remains limited and does not establish production tenant security. Error responses, editing, long-form navigation, keyboard/focus behavior, and external rendering have not received browser-level verification.
+
+## Follow-on authorization hardening
+
+An interim fail-closed rule now denies all protected business endpoints to non-`admin` roles. PostgreSQL integration tests exercised a viewer's denied overview, project creation and consultation access, alongside normal admin behavior. This deliberately restricts non-admin users until real role and resource policies exist; it is not the requested RBAC/ABAC system and does not provide project-level or RLS isolation. Login itself remains available, and logout remains available to revoke a session.

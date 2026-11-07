@@ -14,7 +14,7 @@ const hash = (password:string) => {const salt=randomBytes(16).toString('hex');re
 
 test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocation', {timeout:30000}, async () => {
  const pool = new Pool({connectionString:url}); const suffix=randomUUID();
- const orgA=randomUUID(),orgB=randomUUID(),userA=randomUUID(),userB=randomUUID();
+ const orgA=randomUUID(),orgB=randomUUID(),userA=randomUUID(),userB=randomUUID(),viewer=randomUUID();
  const emailA=`a-${suffix}@example.test`,emailB=`b-${suffix}@example.test`,password='test-password-unique';
  const port=await freePort();
  let process: ReturnType<typeof spawn>|undefined;
@@ -28,7 +28,9 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   async function login(email:string){const r=await req('/login','POST',{email,password});assert.equal(r.status,201);const c=r.headers.get('set-cookie');assert.ok(c?.includes('HttpOnly'));return c!.split(';')[0];}
   const unauth=await req('/overview');assert.equal(unauth.status,401);assert.equal(unauth.headers.get('cache-control'),'private, no-store');
   const badOrigin=await fetch(base+'/login',{method:'POST',headers:{'content-type':'application/json',origin:'https://attacker.example'},body:JSON.stringify({email:emailA,password})});assert.equal(badOrigin.status,403);
-  const a=await login(emailA),b=await login(emailB);
+  const viewerEmail=`viewer-${suffix}@example.test`;await pool.query('INSERT INTO users(id,email,password_hash,organization_id,role) VALUES($1,$2,$3,$4,$5)',[viewer,viewerEmail,hash(password),orgA,'viewer']);
+  const a=await login(emailA),b=await login(emailB),v=await login(viewerEmail);
+  assert.equal((await req('/overview','GET',undefined,v)).status,403);assert.equal((await req('/projects','POST',{name:'Forbidden',client:'Client'},v)).status,403);assert.equal((await req('/consultations','GET',undefined,v)).status,403);
   const projectRes=await req('/projects','POST',{name:'Test project',client:'Test client'},a);assert.equal(projectRes.status,201);const project=await projectRes.json() as {id:string};
   assert.equal((await req('/tasks','POST',{title:'Cross-tenant attempt',projectId:project.id,priority:'High'},b)).status,400);
   const taskRes=await req('/tasks','POST',{title:'A task',projectId:project.id,priority:'High'},a);assert.equal(taskRes.status,201);const task=await taskRes.json() as {id:string};

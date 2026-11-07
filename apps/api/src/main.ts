@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import 'reflect-metadata';
-import { BadRequestException, Body, Controller, Get, HttpException, Module, Param, Patch, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpException, Module, Param, Patch, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, gt } from 'drizzle-orm';
@@ -19,8 +19,11 @@ function tokenHash(token: string) { return createHash('sha256').update(token).di
 async function identity(req: Request): Promise<Identity> {
  const token = req.cookies?.relay_session;
  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException();
- const [active] = await db.select({sub:users.id,org:users.organizationId}).from(userSessions).innerJoin(users,and(eq(users.id,userSessions.userId),eq(users.organizationId,userSessions.organizationId))).where(and(eq(userSessions.tokenHash,tokenHash(token)),gt(userSessions.expiresAt,new Date())));
- if (!active) throw new UnauthorizedException(); return active;
+ const [active] = await db.select({sub:users.id,org:users.organizationId,role:users.role}).from(userSessions).innerJoin(users,and(eq(users.id,userSessions.userId),eq(users.organizationId,userSessions.organizationId))).where(and(eq(userSessions.tokenHash,tokenHash(token)),gt(userSessions.expiresAt,new Date())));
+ if (!active) throw new UnauthorizedException();
+ // Restrict this early slice to admins until resource-level policies are implemented.
+ if (active.role !== 'admin') throw new ForbiddenException('Access not configured for this role');
+ return active;
 }
 function verifyPassword(password: string, stored: string): boolean { try { const [salt, hash] = stored.split(':'); const expected = Buffer.from(hash, 'hex'); const actual = scryptSync(password, salt, 64); return expected.length === actual.length && timingSafeEqual(expected, actual); } catch { return false; } }
 @Controller('api') class Api {
