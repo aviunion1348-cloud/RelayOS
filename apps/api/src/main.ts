@@ -1,0 +1,34 @@
+import 'dotenv/config';
+import 'reflect-metadata';
+import { BadRequestException, Body, Controller, Get, HttpException, Module, Param, Patch, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { and, desc, eq } from 'drizzle-orm';
+import { Pool } from 'pg';
+import type { Request, Response } from 'express';
+import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
+import { randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { ZodSchema } from 'zod';
+import { prospectSchema, projectSchema, taskSchema, taskUpdateSchema } from './domain';
+import { users, prospects, projects, tasks, audits } from './schema';
+const secret = process.env.SESSION_SECRET;
+if (!process.env.DATABASE_URL || !secret || secret.length < 32) throw new Error('DATABASE_URL and SESSION_SECRET (at least 32 characters) are required');
+const sessionSecret: string = secret;
+const db = drizzle(new Pool({connectionString:process.env.DATABASE_URL}));
+type Identity = { sub: string; org: string };
+function input<T>(schema: ZodSchema<T>, data: unknown): T { const result = schema.safeParse(data); if (!result.success) throw new BadRequestException('Invalid input'); return result.data; }
+async function identity(req: Request): Promise<Identity> { let decoded: Identity; try { decoded = jwt.verify(req.cookies?.relay_session, sessionSecret, { algorithms: ['HS256'] }) as Identity; if (!decoded.sub || !decoded.org) throw new Error(); } catch { throw new UnauthorizedException(); } const active = await db.select({id:users.id}).from(users).where(and(eq(users.id,decoded.sub),eq(users.organizationId,decoded.org))); if (!active.length) throw new UnauthorizedException(); return decoded; }
+function verifyPassword(password: string, stored: string): boolean { try { const [salt, hash] = stored.split(':'); const expected = Buffer.from(hash, 'hex'); const actual = scryptSync(password, salt, 64); return expected.length === actual.length && timingSafeEqual(expected, actual); } catch { return false; } }
+@Controller('api') class Api {
+ @Post('login') async login(@Body() body: unknown, @Res({passthrough:true}) res: Response) { const b = body as {email?:unknown;password?:unknown}; if(typeof b?.email !== 'string' || typeof b?.password !== 'string' || b.email.length>254 || b.password.length>256) throw new UnauthorizedException('Invalid credentials'); const [user] = await db.select().from(users).where(eq(users.email,b.email.trim().toLowerCase())); if (!user || !verifyPassword(b.password,user.passwordHash)) throw new UnauthorizedException('Invalid credentials'); res.cookie('relay_session',jwt.sign({org:user.organizationId},sessionSecret,{subject:user.id,expiresIn:'8h',algorithm:'HS256'}),{httpOnly:true,sameSite:'strict',secure:process.env.NODE_ENV==='production',path:'/',maxAge:8*3600000}); return {email:user.email}; }
+ @Post('logout') logout(@Res({passthrough:true}) res:Response) {res.clearCookie('relay_session',{path:'/'});return {ok:true};}
+ @Get('overview') async overview(@Req() req:Request) { const u=await identity(req); const [user,p,pr,t,a]=await Promise.all([db.select({email:users.email}).from(users).where(and(eq(users.id,u.sub),eq(users.organizationId,u.org))),db.select().from(prospects).where(eq(prospects.organizationId,u.org)).orderBy(desc(prospects.createdAt)).limit(100),db.select().from(projects).where(eq(projects.organizationId,u.org)).orderBy(desc(projects.createdAt)).limit(100),db.select().from(tasks).where(eq(tasks.organizationId,u.org)).orderBy(desc(tasks.createdAt)).limit(200),db.select().from(audits).where(eq(audits.organizationId,u.org)).orderBy(desc(audits.createdAt)).limit(8)]); if(!user.length) throw new UnauthorizedException(); return {user:user[0],prospects:p,projects:pr,tasks:t,audits:a}; }
+ @Post('prospects') async prospect(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(prospectSchema,body),id=randomUUID(); try {return await db.transaction(async tx=>{const [p]=await tx.insert(prospects).values({...data,id,organizationId:u.org}).returning(); await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'prospect.created',resourceId:id});return p;});} catch(e:any){if(e.code==='23505') throw new HttpException('A prospect with this email already exists',409);throw e;} }
+ @Post('projects') async project(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(projectSchema,body),id=randomUUID();return db.transaction(async tx=>{const [p]=await tx.insert(projects).values({...data,id,organizationId:u.org}).returning();await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'project.created',resourceId:id});return p;});}
+ @Post('tasks') async task(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(taskSchema,body),id=randomUUID();return db.transaction(async tx=>{const p=await tx.select({id:projects.id}).from(projects).where(and(eq(projects.id,data.projectId),eq(projects.organizationId,u.org)));if(!p.length) throw new BadRequestException('Project not found');const [t]=await tx.insert(tasks).values({...data,id,organizationId:u.org}).returning();await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'task.created',resourceId:id});return t;});}
+ @Patch('tasks/:id') async updateTask(@Req() req:Request,@Param('id') id:string,@Body() body:unknown) {const u=await identity(req),data=input(taskUpdateSchema,body);return db.transaction(async tx=>{const updated=await tx.update(tasks).set(data).where(and(eq(tasks.id,id),eq(tasks.organizationId,u.org))).returning({id:tasks.id});if(!updated.length) throw new BadRequestException('Task not found');await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:`task.status.${data.status}`,resourceId:id});return {ok:true};});}
+}
+@Module({controllers:[Api]}) class AppModule {}
+async function bootstrap(){const app=await NestFactory.create(AppModule);app.use(cookieParser());app.use((req:Request,res:Response,next:()=>void)=>{res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Content-Type-Options','nosiff');if(!['GET','HEAD','OPTIONS'].includes(req.method)){const origin=req.headers.origin,host=req.headers['x-forwarded-host']||req.headers.host;if(origin){try{if(new URL(origin).host!==host)return res.status(403).json({message:'Origin rejected'});}catch{return res.status(403).json({message:'Origin rejected'});}}}next();});await app.listen(3001,'127.0.0.1');}
+bootstrap().catch(()=>{console.error('API startup failed');process.exit(1);});
