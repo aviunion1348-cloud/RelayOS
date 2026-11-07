@@ -1,0 +1,10 @@
+import { pgTable, text, timestamp, unique } from 'drizzle-orm/pg-core';
+const id = () => text('id').primaryKey();
+const org = () => text('organization_id').notNull();
+const created = () => timestamp('created_at', {withTimezone:true}).notNull().defaultNow();
+export const organizations = pgTable('organizations',{id:id(),name:text('name').notNull()});
+export const users = pgTable('users',{id:id(),email:text('email').notNull().unique(),passwordHash:text('password_hash').notNull(),organizationId:org(),role:text('role').notNull().default('admin')});
+export const prospects = pgTable('prospects',{id:id(),organizationId:org(),name:text('name').notNull(),email:text('email').notNull(),company:text('company').notNull(),stage:text('stage').notNull().default('Outreach'),createdAt:created()}, t => [unique().on(t.organizationId,t.email)]);
+export const projects = pgTable('projects',{id:id(),organizationId:org(),name:text('name').notNull(),client:text('client').notNull(),status:text('status').notNull().default('Planning'),createdAt:created()});
+export const tasks = pgTable('tasks',{id:id(),organizationId:org(),projectId:text('project_id').notNull(),title:text('title').notNull(),status:text('status').notNull().default('To do'),priority:text('priority').notNull().default('Medium'),createdAt:created()});
+export const audits = pgTable('audits',{id:id(),organizationId:org(),actorId:text('actor_id').notNull(),action:text('action').notNull(),resourceId:text('resource_id').notNull(),createdAt:created()});
