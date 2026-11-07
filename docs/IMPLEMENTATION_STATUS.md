@@ -16,3 +16,6 @@ The existing prospect/project/task slice has been retained. A new additive migra
 - No production deployment, branch protection changes or production data use. PostgreSQL 16 in CI has not been observed yet; local checks used a disposable PostgreSQL 18.6 instance. The existing Compose database owner role remains local-development only.
 
 Release 2 and Release 3 remain unimplemented. The 3,500 edge-case catalogue requires distinct cases and owner-approved counting scope; no count or execution claim is made.
+
+### Discovery checkpoint
+- Consultation and draft requirement creation/listing are implemented. PostgreSQL-backed API persistence and targeted cross-organization denial tests passed. The UI builds but is **not browser verified**; browser launch failed due to missing NSS/NSPR libraries. Details and omissions: `docs/quality/CHECKPOINT_DISCOVERY.md`.

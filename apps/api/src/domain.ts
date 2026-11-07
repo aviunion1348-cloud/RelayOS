@@ -3,3 +3,6 @@ export const prospectSchema = z.object({ name: z.string().trim().min(1).max(120)
 export const projectSchema = z.object({ name: z.string().trim().min(1).max(120), client: z.string().trim().min(1).max(120) }).strict();
 export const taskSchema = z.object({ title: z.string().trim().min(1).max(200), projectId: z.string().min(1).max(100), priority: z.enum(['Low', 'Medium', 'High', 'Urgent']) }).strict();
 export const taskUpdateSchema = z.object({ status: z.enum(['To do', 'In progress', 'Blocked', 'Done']) }).strict();
+const notes = z.string().trim().max(4000).default('');
+export const consultationSchema = z.object({prospectId:z.string().min(1).max(100),title:z.string().trim().min(1).max(160),organizationDetails:notes,infrastructure:notes,hosting:notes,engineeringTeam:notes,existingTechnology:notes,operationalDifficulties:notes,businessRequirements:notes,productOpportunities:notes,expectedResults:notes,technicalConstraints:notes}).strict();
+export const requirementSchema = z.object({consultationId:z.string().min(1).max(100),title:z.string().trim().min(1).max(160),description:z.string().trim().min(1).max(4000)}).strict();

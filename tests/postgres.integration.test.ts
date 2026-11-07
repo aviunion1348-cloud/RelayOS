@@ -38,7 +38,14 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   await assert.rejects(pool.query('INSERT INTO tasks(id,organization_id,project_id,title) VALUES($1,$2,$3,$4)',[randomUUID(),orgB,project.id,'Invalid cross-tenant FK']), (e: any)=>e.code==='23503');
   const stored=await pool.query('SELECT status FROM tasks WHERE id=$1 AND organization_id=$2',[task.id,orgA]);assert.equal(stored.rows[0].status,'Done');
   const audit=await pool.query('SELECT action FROM audits WHERE organization_id=$1 ORDER BY created_at',[orgA]);assert.deepEqual(audit.rows.map(r=>r.action),['project.created','task.created','task.status.Done']);
-  const prospect={name:'Test person',company:'Test company',email:`${suffix}@example.test`};assert.equal((await req('/prospects','POST',prospect,a)).status,201);assert.equal((await req('/prospects','POST',prospect,a)).status,409);
+  const prospect={name:'Test person',company:'Test company',email:`${suffix}@example.test`};const createdProspect=await req('/prospects','POST',prospect,a);assert.equal(createdProspect.status,201);const prospectRecord=await createdProspect.json() as {id:string};assert.equal((await req('/prospects','POST',prospect,a)).status,409);
+  assert.equal((await req('/consultations','POST',{prospectId:prospectRecord.id,title:'Forbidden'},b)).status,400);
+  const consult=await req('/consultations','POST',{prospectId:prospectRecord.id,title:'Discovery',infrastructure:'Existing cloud',businessRequirements:'Reliable service'},a);assert.equal(consult.status,201);const consultation=await consult.json() as {id:string};
+  assert.equal((await req('/requirements','POST',{consultationId:consultation.id,title:'Cross tenant',description:'Forbidden'},b)).status,400);
+  const requirement=await req('/requirements','POST',{consultationId:consultation.id,title:'Availability',description:'Define recovery objective'},a);assert.equal(requirement.status,201);assert.equal((await requirement.json() as {status:string}).status,'Draft');
+  assert.equal(((await (await req('/consultations','GET',undefined,b)).json()) as unknown[]).length,0);assert.equal(((await (await req('/requirements','GET',undefined,b)).json()) as unknown[]).length,0);
+  const persisted=await pool.query('SELECT c.infrastructure,r.description FROM consultations c JOIN requirements r ON r.consultation_id=c.id WHERE c.id=$1',[consultation.id]);assert.equal(persisted.rows[0].infrastructure,'Existing cloud');assert.equal(persisted.rows[0].description,'Define recovery objective');
+  await assert.rejects(pool.query('INSERT INTO consultations(id,organization_id,prospect_id,created_by,title) VALUES($1,$2,$3,$4,$5)',[randomUUID(),orgB,prospectRecord.id,userB,'Invalid cross-tenant FK']), (e:any)=>e.code==='23503');
   assert.equal((await req('/logout','POST',{},a)).status,201);assert.equal((await req('/overview','GET',undefined,a)).status,401);
   const session=await pool.query('SELECT count(*)::int AS count FROM user_sessions WHERE user_id=$1',[userA]);assert.equal(session.rows[0].count,0);
  } finally {process?.kill('SIGTERM');await pool.end();}

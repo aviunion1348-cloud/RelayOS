@@ -10,3 +10,5 @@ The uploaded master directive is preserved verbatim in `MASTER_DIRECTIVE.md`. Th
 | Master directive, authentication | Secure sessions and revocation | `user_sessions`, login/logout/identity | Targeted logout and reuse integration test; full session management pending |
 | Master directive, database | PostgreSQL persistence, migration safety, isolation | SQL migrations, migration runner and API | Isolated PostgreSQL tests; comprehensive isolation and production roles pending |
 | Master directive, QA | 3,500 distinct edge cases, owner-defined scope | `EDGE_CASE_CATALOG_POLICY.md` | Taxonomy documented; catalogue and execution not implemented |
+| Master directive stages 2 and 4 | Capture initial and technical consultation discussion | `consultations` PostgreSQL records, API, Consultations screen | API integration tests passed; UI browser verification pending |
+| Master directive requirements | Draft requirements linked to consultation | `requirements` table, API, Consultations screen | API persistence and isolation tested; approvals/baselining not implemented |
