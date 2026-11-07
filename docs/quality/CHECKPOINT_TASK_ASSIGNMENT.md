@@ -1,0 +1,5 @@
+# Task assignment checkpoint — 2026-11-08
+
+Migration 006 adds nullable task owner and reviewer references with composite organization foreign keys. The API permits an admin to assign or clear both roles together after checking organization membership, and records a transactional audit event. Work board includes assignment controls and displays selected identities. Assignments do not grant access: non-admin roles are still blocked by the interim fail-closed guard. Project membership checks, availability, delegation, user lifecycle and optimistic concurrency remain unimplemented; simultaneous updates can overwrite each other. The UI remains browser unverified.
+
+Evidence: isolated PostgreSQL 18.6 integration tests passed for assignment persistence, cross-organization API denial, database foreign-key rejection and audit event; migration upgrade from 001 retained the existing organization. `npm run typecheck`, three unit tests, and `npm run build` passed. Browser accessibility and Anti-Slop Delivery Gate are NOT TESTED. This does not constitute full role-based authorization or completion of task accountability.

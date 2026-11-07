@@ -43,10 +43,15 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   const taskRes=await req('/tasks','POST',{title:'A task',projectId:project.id,priority:'High'},a);assert.equal(taskRes.status,201);const task=await taskRes.json() as {id:string};
   assert.equal((await req('/tasks/'+task.id,'PATCH',{status:'Done'},b)).status,400);
   assert.equal((await req('/tasks/'+task.id,'PATCH',{status:'Done'},a)).status,200);
+  assert.equal((await req('/tasks/'+task.id+'/assignment','PATCH',{ownerId:userB,reviewerId:null},a)).status,400);
+  assert.equal((await req('/tasks/'+task.id+'/assignment','PATCH',{ownerId:userA,reviewerId:viewer},a)).status,200);
+  await assert.rejects(pool.query('UPDATE tasks SET owner_id=$1 WHERE id=$2',[userB,task.id]),(e:any)=>e.code==='23503');
+  const assignment=await pool.query('SELECT owner_id,reviewer_id FROM tasks WHERE id=$1',[task.id]);assert.equal(assignment.rows[0].owner_id,userA);assert.equal(assignment.rows[0].reviewer_id,viewer);
+
   const resultB=await (await req('/overview','GET',undefined,b)).json() as {projects:unknown[];tasks:unknown[]};assert.deepEqual(resultB.projects,[]);assert.deepEqual(resultB.tasks,[]);
   await assert.rejects(pool.query('INSERT INTO tasks(id,organization_id,project_id,title) VALUES($1,$2,$3,$4)',[randomUUID(),orgB,project.id,'Invalid cross-tenant FK']), (e: any)=>e.code==='23503');
   const stored=await pool.query('SELECT status FROM tasks WHERE id=$1 AND organization_id=$2',[task.id,orgA]);assert.equal(stored.rows[0].status,'Done');
-  const audit=await pool.query('SELECT action FROM audits WHERE organization_id=$1 ORDER BY created_at',[orgA]);assert.deepEqual(audit.rows.map(r=>r.action),['project.created','milestone.created','project.created','module.created','task.created','task.status.Done']);
+  const audit=await pool.query('SELECT action FROM audits WHERE organization_id=$1 ORDER BY created_at',[orgA]);assert.deepEqual(audit.rows.map(r=>r.action),['project.created','milestone.created','project.created','module.created','task.created','task.status.Done','task.assignment.updated']);
   const preResponse=await req('/tasks','POST',{title:'Prerequisite',projectId:project.id,priority:'Medium'},a);const pre=await preResponse.json() as {id:string};
   const dependentResponse=await req('/tasks','POST',{title:'Dependent',projectId:project.id,priority:'Medium'},a);const dependent=await dependentResponse.json() as {id:string};
   assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},a)).status,201);
