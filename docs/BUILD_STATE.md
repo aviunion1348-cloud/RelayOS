@@ -7,3 +7,5 @@ Next: build and test client/consultation pipeline, requirements, milestones, con
 Discovery checkpoint: consultations and draft requirements were added with API/DB tests. See `docs/quality/CHECKPOINT_DISCOVERY.md`; UI testing remains blocked by missing browser shared libraries. Continue immediately with granular authorization, the client lifecycle, workflow/QA/handover and remaining Release 1 requirements.
 
 Planning checkpoint: project-linked milestones and modules added with API/database integration checks; browser test remains blocked. Continue with assignment, task dependencies, SLA, QA and non-bypassable handover, then the rest of the source lifecycle. See `docs/quality/CHECKPOINT_PLANNING.md`.
+
+Dependency checkpoint: task graph creation, cycle prevention and completion prerequisites were implemented and tested; see `docs/quality/CHECKPOINT_DEPENDENCIES.md`. The next implementation priority is task ownership, assignment and dependencies management, then SLA/QA/handover. The full directive and Release 1 remain unfinished.

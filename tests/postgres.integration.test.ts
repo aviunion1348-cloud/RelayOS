@@ -47,6 +47,21 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   await assert.rejects(pool.query('INSERT INTO tasks(id,organization_id,project_id,title) VALUES($1,$2,$3,$4)',[randomUUID(),orgB,project.id,'Invalid cross-tenant FK']), (e: any)=>e.code==='23503');
   const stored=await pool.query('SELECT status FROM tasks WHERE id=$1 AND organization_id=$2',[task.id,orgA]);assert.equal(stored.rows[0].status,'Done');
   const audit=await pool.query('SELECT action FROM audits WHERE organization_id=$1 ORDER BY created_at',[orgA]);assert.deepEqual(audit.rows.map(r=>r.action),['project.created','milestone.created','project.created','module.created','task.created','task.status.Done']);
+  const preResponse=await req('/tasks','POST',{title:'Prerequisite',projectId:project.id,priority:'Medium'},a);const pre=await preResponse.json() as {id:string};
+  const dependentResponse=await req('/tasks','POST',{title:'Dependent',projectId:project.id,priority:'Medium'},a);const dependent=await dependentResponse.json() as {id:string};
+  assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},a)).status,201);
+  assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},a)).status,409);
+  assert.equal((await req('/tasks/'+pre.id+'/dependencies','POST',{dependsOnId:dependent.id},a)).status,400);
+  assert.equal((await req('/tasks/'+dependent.id,'PATCH',{status:'Done'},a)).status,400);
+  assert.equal((await req('/tasks/'+pre.id,'PATCH',{status:'Done'},a)).status,200);
+  assert.equal((await req('/tasks/'+dependent.id,'PATCH',{status:'Done'},a)).status,200);
+  assert.equal((await req('/tasks/'+pre.id,'PATCH',{status:'In progress'},a)).status,400);
+  assert.equal((await req('/tasks/'+dependent.id+'/dependencies','POST',{dependsOnId:pre.id},b)).status,400);
+  const x=await (await req('/tasks','POST',{title:'Concurrent X',projectId:project.id,priority:'Medium'},a)).json() as {id:string};
+  const y=await (await req('/tasks','POST',{title:'Concurrent Y',projectId:project.id,priority:'Medium'},a)).json() as {id:string};
+  const concurrent=await Promise.all([req('/tasks/'+x.id+'/dependencies','POST',{dependsOnId:y.id},a),req('/tasks/'+y.id+'/dependencies','POST',{dependsOnId:x.id},a)]);
+  assert.deepEqual(concurrent.map(r=>r.status).sort(),[201,400]);
+
   const prospect={name:'Test person',company:'Test company',email:`${suffix}@example.test`};const createdProspect=await req('/prospects','POST',prospect,a);assert.equal(createdProspect.status,201);const prospectRecord=await createdProspect.json() as {id:string};assert.equal((await req('/prospects','POST',prospect,a)).status,409);
   assert.equal((await req('/consultations','POST',{prospectId:prospectRecord.id,title:'Forbidden'},b)).status,400);
   const consult=await req('/consultations','POST',{prospectId:prospectRecord.id,title:'Discovery',infrastructure:'Existing cloud',businessRequirements:'Reliable service'},a);assert.equal(consult.status,201);const consultation=await consult.json() as {id:string};

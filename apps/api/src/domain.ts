@@ -8,3 +8,4 @@ export const consultationSchema = z.object({prospectId:z.string().min(1).max(100
 export const requirementSchema = z.object({consultationId:z.string().min(1).max(100),title:z.string().trim().min(1).max(160),description:z.string().trim().min(1).max(4000)}).strict();
 export const milestoneSchema = z.object({projectId:z.string().min(1).max(100),title:z.string().trim().min(1).max(160),description:z.string().trim().max(4000).default('')}).strict();
 export const deliveryModuleSchema = milestoneSchema.extend({milestoneId:z.string().max(100).optional().transform(v=>v || null)}).strict();
+export const dependencySchema = z.object({dependsOnId:z.string().min(1).max(100)}).strict();
