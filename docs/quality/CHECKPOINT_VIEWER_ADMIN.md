@@ -1,0 +1,7 @@
+# Viewer grant administration — 2026-11-08
+
+Organization admins can list, grant and revoke project-summary viewer access in the Projects screen. The backend independently enforces admin authorization, same-organization users/projects and transactional actor/target audit. Viewer accounts can see only explicitly shared project summaries; a grant does not unlock existing admin-only endpoints. The list is capped at 1,000 grants and selection uses the existing capped 100 projects/200 users; pagination is not implemented. Revocation is immediate for fresh API requests, but another browser's existing rendered page persists until refreshed.
+
+Local PostgreSQL integration **2 passed / 0 failed**; Chromium **6 passed / 0 failed**, including real admin UI grant/revoke and viewer UI refresh/sign-out plus viewer unauthorized API request. Typecheck and production build passed. Unit **3/3** passed at `1b5ca95`, not rerun for this UI/API slice. The browser suite also includes limited axe scans, not an accessibility certification. CI for `d35cb00` succeeded: https://github.com/aviunion1348-cloud/RelayOS/actions/runs/42436559044; check this commit's CI separately.
+
+Full permission matrix, client/project memberships beyond summary viewing, user lifecycle, RLS, pagination, private verified evidence, approvals, handover gates, SLA, comprehensive security/accessibility and remaining directive work remain incomplete. Admins retain organization-wide access. No production readiness claim.

@@ -33,12 +33,12 @@ test('PostgreSQL API: persistence, tenant boundaries, audit, and session revocat
   assert.equal((await req('/overview','GET',undefined,v)).status,403);assert.equal((await req('/projects','POST',{name:'Forbidden',client:'Client'},v)).status,403);assert.equal((await req('/consultations','GET',undefined,v)).status,403);
   const projectRes=await req('/projects','POST',{name:'Test project',client:'Test client'},a);assert.equal(projectRes.status,201);const project=await projectRes.json() as {id:string};
   assert.equal((await req('/project-view/'+project.id,'GET',undefined,v)).status,403);assert.deepEqual(await (await req('/my-project-views','GET',undefined,v)).json(),[]);
-  assert.equal((await req('/projects/'+project.id+'/view-members','POST',{userId:viewer},v)).status,403);
+  assert.equal((await req('/projects/'+project.id+'/view-members','POST',{userId:viewer},v)).status,403);assert.equal((await req('/project-view-members','GET',undefined,v)).status,403);
   assert.equal((await req('/projects/'+project.id+'/view-members','POST',{userId:viewer},b)).status,400);
   assert.equal((await req('/projects/'+project.id+'/view-members','POST',{userId:userB},a)).status,400);
   assert.equal((await req('/projects/'+project.id+'/view-members','POST',{userId:viewer},a)).status,201);
   assert.equal((await req('/projects/'+project.id+'/view-members','POST',{userId:viewer},a)).status,409);
-  assert.equal((await req('/project-view/'+project.id,'GET',undefined,v)).status,200);assert.equal(((await (await req('/my-project-views','GET',undefined,v)).json()) as unknown[]).length,1);
+  assert.equal((await req('/project-view/'+project.id,'GET',undefined,v)).status,200);assert.equal(((await (await req('/project-view-members','GET',undefined,a)).json()) as unknown[]).length,1);assert.deepEqual(await (await req('/project-view-members','GET',undefined,b)).json(),[]);assert.equal(((await (await req('/my-project-views','GET',undefined,v)).json()) as unknown[]).length,1);
   assert.equal((await req('/project-view/'+project.id,'GET',undefined,b)).status,403);
   assert.equal((await req('/overview','GET',undefined,v)).status,403);
   assert.equal((await req('/projects/'+project.id+'/view-members/'+viewer,'DELETE',undefined,v)).status,403);
