@@ -17,3 +17,7 @@ Continue implementing and browser-testing the operational core. Implement actual
 Tests require an isolated disposable migrated PostgreSQL database, `TEST_DATABASE_URL` and `RELAYOS_DISPOSABLE_TEST_DB=yes`; they leave synthetic records and test schema. CI uses PostgreSQL 16 and standard Playwright browser dependencies. Never use shared or production data, force-push, deploy, or change repository permissions without authorization.
 
 Latest local follow-up: `docs/quality/CHECKPOINT_CONFLICT_RECOVERY.md` records two-tab conflict refresh/review/retry. The new browser CI run for `38e8065` was in progress when checked; check its result and the current commit CI.
+
+## Latest authorization slice
+
+Migrations 009–010 and the narrow admin-managed project-view membership endpoint add current-membership checks and target-aware audit. See `docs/quality/CHECKPOINT_PROJECT_VIEW.md`: integration 2/2, browser 6/6, unit 3/3 and build/typecheck/audit passed locally. This is not complete authorization; other business endpoints remain admin-only and membership has no UI. Exact commit `3d05976` CI succeeded: https://github.com/aviunion1348-cloud/RelayOS/actions/runs/42416268366. Check CI for the authorization commit. Next extend project-scoped permissions safely across actual business endpoints with server-side filters and negative tests before enabling non-admin UI; then evidence, handover and SLA as ordered in the user request. Keep main untouched.

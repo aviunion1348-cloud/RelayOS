@@ -13,3 +13,5 @@ export const assignmentSchema = z.object({ownerId:z.string().max(100).nullable()
 const requiredDetail = z.string().trim().min(1).max(4000);
 export const qaCaseSchema = z.object({projectId:z.string().min(1).max(100),moduleId:z.string().min(1).max(100),requirementId:z.string().max(100).optional().transform(v=>v||null),title:z.string().trim().min(1).max(160),category:z.string().trim().min(1).max(120),risk:requiredDetail,preconditions:requiredDetail,input:requiredDetail,expectedResult:requiredDetail}).strict();
 export const qaResultSchema = z.object({caseId:z.string().min(1).max(100),outcome:z.enum(['Pass','Fail','Blocked','Not run','Skipped']),actualResult:requiredDetail,evidenceReference:z.string().trim().max(1000).default(''),buildVersion:z.string().trim().min(1).max(120),environment:z.string().trim().min(1).max(120)}).strict();
+
+export const projectViewMembershipSchema=z.object({userId:z.string().min(1).max(100)}).strict();

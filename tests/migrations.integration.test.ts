@@ -17,7 +17,7 @@ test('additive migration upgrades a 001 database without altering existing recor
   execFileSync('./node_modules/.bin/tsx',['db/migrate.ts'],{env,stdio:'pipe'});
   execFileSync('./node_modules/.bin/tsx',['db/migrate.ts'],{env,stdio:'pipe'});
   assert.equal((await client.query("SELECT name FROM organizations WHERE id='original'")).rows[0].name,'Existing workspace');
-  assert.deepEqual((await client.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(r=>r.name),['001_init','002_sessions','003_consultations','004_delivery_planning','005_task_dependencies','006_task_ownership','007_task_versions','008_quality_cases']);
+  assert.deepEqual((await client.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(r=>r.name),['001_init','002_sessions','003_consultations','004_delivery_planning','005_task_dependencies','006_task_ownership','007_task_versions','008_quality_cases','009_project_view_membership','010_audit_target']);
   assert.equal((await client.query('SELECT count(*)::int AS count FROM user_sessions')).rows[0].count,0);
  } finally {client.release();await pool.end();}
 });

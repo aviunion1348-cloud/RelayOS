@@ -70,3 +70,16 @@ test('assignment conflict requires refresh and review before retry',async({page,
  await other.getByRole('button',{name:'Refresh task data'}).click();await expect(other.locator('select[name=taskId]')).toHaveValue('');await other.locator('select[name=taskId]').selectOption({label:'Assignment conflict'});await expect(other.locator('select[name=reviewerId]')).toHaveValue(user.id);await other.locator('select[name=ownerId]').selectOption(user.id);await save(other,'assignment');
  const saved=await pool.query('SELECT owner_id,reviewer_id FROM tasks WHERE organization_id=$1 AND title=$2',[user.org,'Assignment conflict']);expect(saved.rows[0]).toMatchObject({owner_id:user.id,reviewer_id:user.id});
 });
+
+test('viewer project access is scoped and revocation takes effect in an existing browser session',async({page,context})=>{
+ const viewerId=randomUUID(),viewerEmail=`viewer-${randomUUID()}@example.test`,salt=randomBytes(16).toString('hex');
+ await pool.query('INSERT INTO users(id,email,password_hash,organization_id,role) VALUES($1,$2,$3,$4,$5)',[viewerId,viewerEmail,`${salt}:${scryptSync(password,salt,64).toString('hex')}`,user.org,'viewer']);
+ await login(page);await addProject(page);const project=(await pool.query('SELECT id FROM projects WHERE organization_id=$1',[user.org])).rows[0].id;
+ const viewerContext=await context.browser()!.newContext();const viewerPage=await viewerContext.newPage();await viewerPage.goto('/');await viewerPage.getByLabel('Email').fill(viewerEmail);await viewerPage.getByLabel('Password').fill(password);await viewerPage.getByRole('button',{name:/Sign in/}).click();
+ await expect.poll(()=>viewerPage.evaluate(async()=> (await fetch('/api/overview')).status)).toBe(403);
+ const view=()=>viewerPage.evaluate(async id=>(await fetch('/api/project-view/'+id)).status,project);
+ expect(await view()).toBe(403);
+ const grant=await page.evaluate(async({project,viewerId})=>(await fetch('/api/projects/'+project+'/view-members',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userId:viewerId})})).status,{project,viewerId});expect(grant).toBe(201);expect(await view()).toBe(200);
+ const denied=await viewerPage.evaluate(async project=>(await fetch('/api/projects/'+project+'/view-members',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userId:'any'})})).status,project);expect(denied).toBe(403);
+ const revoke=await page.evaluate(async({project,viewerId})=>(await fetch('/api/projects/'+project+'/view-members/'+viewerId,{method:'DELETE'})).status,{project,viewerId});expect(revoke).toBe(200);expect(await view()).toBe(403);await viewerContext.close();
+});

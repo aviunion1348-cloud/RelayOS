@@ -30,3 +30,6 @@ Release 2 and Release 3 remain unimplemented. The 3,500 edge-case catalogue requ
 
 ### Browser checkpoint (supersedes earlier browser-unverified statements)
 Four Chromium/PostgreSQL E2E tests passed locally for the narrow journeys, concurrency rejection, mobile keyboard and limited automated accessibility scans documented in `docs/quality/CHECKPOINT_BROWSER.md`. Earlier notes about Chromium being unavailable and the entire UI being browser-unverified are historical. These results do not establish comprehensive accessibility or production readiness; CI for the new browser job is not yet verified. Evidence references remain unverified.
+
+### Scoped project-view authorization
+A limited membership-gated project summary endpoint and transactional admin grant/revoke audit are verified locally; other business endpoints remain admin-only. This is not a complete permission model or viewer UI. See `docs/quality/CHECKPOINT_PROJECT_VIEW.md`.

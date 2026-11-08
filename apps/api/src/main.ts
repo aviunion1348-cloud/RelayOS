@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import 'reflect-metadata';
-import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpException, Module, Param, Patch, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpException, Module, Param, Patch, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
@@ -9,19 +9,23 @@ import type { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { ZodSchema } from 'zod';
-import { prospectSchema, projectSchema, taskSchema, taskUpdateSchema, consultationSchema, requirementSchema, milestoneSchema, deliveryModuleSchema, dependencySchema, assignmentSchema, qaCaseSchema, qaResultSchema } from './domain';
-import { users, prospects, projects, tasks, audits, userSessions, consultations, requirements, milestones, deliveryModules, taskDependencies, qaCases, qaResults } from './schema';
+import { prospectSchema, projectSchema, taskSchema, taskUpdateSchema, consultationSchema, requirementSchema, milestoneSchema, deliveryModuleSchema, dependencySchema, assignmentSchema, qaCaseSchema, qaResultSchema, projectViewMembershipSchema } from './domain';
+import { users, prospects, projects, tasks, audits, userSessions, consultations, requirements, milestones, deliveryModules, taskDependencies, qaCases, qaResults, projectViewMemberships } from './schema';
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
 const db = drizzle(new Pool({connectionString:process.env.DATABASE_URL}));
-type Identity = { sub: string; org: string };
+type Identity = { sub: string; org: string; role: string };
 function input<T>(schema: ZodSchema<T>, data: unknown): T { const result = schema.safeParse(data); if (!result.success) throw new BadRequestException('Invalid input'); return result.data; }
 function tokenHash(token: string) { return createHash('sha256').update(token).digest('hex'); }
-async function identity(req: Request): Promise<Identity> {
+async function sessionIdentity(req: Request): Promise<Identity> {
  const token = req.cookies?.relay_session;
  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException();
  const [active] = await db.select({sub:users.id,org:users.organizationId,role:users.role}).from(userSessions).innerJoin(users,and(eq(users.id,userSessions.userId),eq(users.organizationId,userSessions.organizationId))).where(and(eq(userSessions.tokenHash,tokenHash(token)),gt(userSessions.expiresAt,new Date())));
  if (!active) throw new UnauthorizedException();
- // Restrict this early slice to admins until resource-level policies are implemented.
+ return active;
+}
+async function identity(req: Request): Promise<Identity> {
+ const active=await sessionIdentity(req);
+ // Existing broad endpoints remain admin-only; membership grants no access to them.
  if (active.role !== 'admin') throw new ForbiddenException('Access not configured for this role');
  return active;
 }
@@ -47,6 +51,21 @@ function verifyPassword(password: string, stored: string): boolean { try { const
  @Post('consultations') async createConsultation(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(consultationSchema,body),id=randomUUID();return db.transaction(async tx=>{const owner=await tx.select({id:prospects.id}).from(prospects).where(and(eq(prospects.id,data.prospectId),eq(prospects.organizationId,u.org)));if(!owner.length)throw new BadRequestException('Prospect not found');const [record]=await tx.insert(consultations).values({...data,id,organizationId:u.org,createdBy:u.sub}).returning();await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'consultation.created',resourceId:id});return record;});}
  @Get('requirements') async listRequirements(@Req() req:Request) {const u=await identity(req);return db.select().from(requirements).where(eq(requirements.organizationId,u.org)).orderBy(desc(requirements.createdAt)).limit(200);}
  @Post('requirements') async createRequirement(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(requirementSchema,body),id=randomUUID();return db.transaction(async tx=>{const parent=await tx.select({id:consultations.id}).from(consultations).where(and(eq(consultations.id,data.consultationId),eq(consultations.organizationId,u.org)));if(!parent.length)throw new BadRequestException('Consultation not found');const [record]=await tx.insert(requirements).values({...data,id,organizationId:u.org,createdBy:u.sub}).returning();await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'requirement.created',resourceId:id});return record;});}
+ // The viewer endpoint returns only project summary fields, never org-wide records or audit data.
+ @Get('project-view/:id') async projectView(@Req() req:Request,@Param('id') id:string) {
+  const u=await sessionIdentity(req);
+  if(u.role==='admin') {const [project]=await db.select({id:projects.id,name:projects.name,client:projects.client,status:projects.status}).from(projects).where(and(eq(projects.id,id),eq(projects.organizationId,u.org)));if(!project)throw new ForbiddenException('Project unavailable');return project;}
+  if(u.role!=='viewer')throw new ForbiddenException('Project unavailable');
+  const [project]=await db.select({id:projects.id,name:projects.name,client:projects.client,status:projects.status}).from(projects).innerJoin(projectViewMemberships,and(eq(projectViewMemberships.projectId,projects.id),eq(projectViewMemberships.organizationId,projects.organizationId),eq(projectViewMemberships.userId,u.sub))).where(and(eq(projects.id,id),eq(projects.organizationId,u.org)));
+  if(!project)throw new ForbiddenException('Project unavailable');return project;
+ }
+ @Post('projects/:id/view-members') async grantProjectView(@Req() req:Request,@Param('id') id:string,@Body() body:unknown) {
+  const u=await identity(req),data=input(projectViewMembershipSchema,body);
+  return db.transaction(async tx=>{const [p]=await tx.select({id:projects.id}).from(projects).where(and(eq(projects.id,id),eq(projects.organizationId,u.org)));const [member]=await tx.select({id:users.id}).from(users).where(and(eq(users.id,data.userId),eq(users.organizationId,u.org),eq(users.role,'viewer')));if(!p||!member)throw new BadRequestException('Project or viewer unavailable');const inserted=await tx.insert(projectViewMemberships).values({organizationId:u.org,projectId:id,userId:data.userId,grantedBy:u.sub}).onConflictDoNothing().returning({userId:projectViewMemberships.userId});if(!inserted.length)throw new HttpException('Membership already exists',409);await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'project.view.granted',resourceId:id,targetUserId:data.userId});return {ok:true};});
+ }
+ @Delete('projects/:id/view-members/:userId') async revokeProjectView(@Req() req:Request,@Param('id') id:string,@Param('userId') userId:string) {
+  const u=await identity(req);return db.transaction(async tx=>{const removed=await tx.delete(projectViewMemberships).where(and(eq(projectViewMemberships.organizationId,u.org),eq(projectViewMemberships.projectId,id),eq(projectViewMemberships.userId,userId))).returning({userId:projectViewMemberships.userId});if(!removed.length)throw new BadRequestException('Membership unavailable');await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'project.view.revoked',resourceId:id,targetUserId:userId});return {ok:true};});
+ }
  @Post('projects') async project(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(projectSchema,body),id=randomUUID();return db.transaction(async tx=>{const [p]=await tx.insert(projects).values({...data,id,organizationId:u.org}).returning();await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'project.created',resourceId:id});return p;});}
  @Get('milestones') async listMilestones(@Req() req:Request) {const u=await identity(req);return db.select().from(milestones).where(eq(milestones.organizationId,u.org)).orderBy(desc(milestones.createdAt)).limit(200);}
  @Post('milestones') async createMilestone(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(milestoneSchema,body),id=randomUUID();return db.transaction(async tx=>{const project=await tx.select({id:projects.id}).from(projects).where(and(eq(projects.id,data.projectId),eq(projects.organizationId,u.org)));if(!project.length)throw new BadRequestException('Project not found');const [record]=await tx.insert(milestones).values({...data,id,organizationId:u.org,createdBy:u.sub}).returning();await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'milestone.created',resourceId:id});return record;});}
