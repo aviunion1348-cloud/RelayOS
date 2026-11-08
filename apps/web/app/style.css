@@ -5,3 +5,5 @@ textarea{display:block;width:100%;margin-top:7px;padding:11px;border:1px solid #
 .mobile-signout{display:none}@media(max-width:600px){.panel-head{flex-direction:column;align-items:stretch}.panel-head .actions,.actions{flex-wrap:wrap}.sidebar nav button{width:auto;flex:0 0 auto}.main{width:100%}.mobile-signout{display:inline-flex;align-items:center;justify-content:center;min-height:44px;border:0;background:transparent;color:#476e57;font-size:12px;font-weight:700}.top-avatar{margin-left:4px}.top-right{gap:4px}.row{min-width:0}.row-main{overflow-wrap:anywhere}.status-select{max-width:40%}}
 /* Muted copy remains readable against the light workspace surfaces. */
 :root{--muted:#566961}.eyebrow,.nav-label,.muted,.login-note,.workspace small,.profile small,.crumb,.slash,.top-right,nav button,.stat-top,.stat p,.empty p,.row-main small,.activity small,footer,.subtle,.discovery summary span{color:#566961}
+
+.viewer-header{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 24px;background:#fff;border-bottom:1px solid var(--border)}

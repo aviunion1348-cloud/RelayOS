@@ -33,3 +33,4 @@ Four Chromium/PostgreSQL E2E tests passed locally for the narrow journeys, concu
 
 ### Scoped project-view authorization
 A limited membership-gated project summary endpoint and transactional admin grant/revoke audit are verified locally; other business endpoints remain admin-only. This is not a complete permission model or viewer UI. See `docs/quality/CHECKPOINT_PROJECT_VIEW.md`.
+- Viewer accounts can now sign in to a read-only, membership-filtered project summary page. This is not a client portal or complete permission model; grant/revoke management has no UI. See `docs/quality/CHECKPOINT_VIEWER_UI.md`.

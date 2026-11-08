@@ -52,6 +52,10 @@ function verifyPassword(password: string, stored: string): boolean { try { const
  @Get('requirements') async listRequirements(@Req() req:Request) {const u=await identity(req);return db.select().from(requirements).where(eq(requirements.organizationId,u.org)).orderBy(desc(requirements.createdAt)).limit(200);}
  @Post('requirements') async createRequirement(@Req() req:Request,@Body() body:unknown) {const u=await identity(req),data=input(requirementSchema,body),id=randomUUID();return db.transaction(async tx=>{const parent=await tx.select({id:consultations.id}).from(consultations).where(and(eq(consultations.id,data.consultationId),eq(consultations.organizationId,u.org)));if(!parent.length)throw new BadRequestException('Consultation not found');const [record]=await tx.insert(requirements).values({...data,id,organizationId:u.org,createdBy:u.sub}).returning();await tx.insert(audits).values({id:randomUUID(),organizationId:u.org,actorId:u.sub,action:'requirement.created',resourceId:id});return record;});}
  // The viewer endpoint returns only project summary fields, never org-wide records or audit data.
+ @Get('my-project-views') async myProjectViews(@Req() req:Request) {
+  const u=await sessionIdentity(req);if(u.role!=='viewer')throw new ForbiddenException('Access not configured for this role');
+  return db.select({id:projects.id,name:projects.name,client:projects.client,status:projects.status}).from(projects).innerJoin(projectViewMemberships,and(eq(projectViewMemberships.projectId,projects.id),eq(projectViewMemberships.organizationId,projects.organizationId),eq(projectViewMemberships.userId,u.sub))).where(eq(projects.organizationId,u.org)).orderBy(desc(projects.createdAt)).limit(100);
+ }
  @Get('project-view/:id') async projectView(@Req() req:Request,@Param('id') id:string) {
   const u=await sessionIdentity(req);
   if(u.role==='admin') {const [project]=await db.select({id:projects.id,name:projects.name,client:projects.client,status:projects.status}).from(projects).where(and(eq(projects.id,id),eq(projects.organizationId,u.org)));if(!project)throw new ForbiddenException('Project unavailable');return project;}
