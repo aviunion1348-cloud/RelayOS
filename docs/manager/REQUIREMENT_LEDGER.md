@@ -14,3 +14,12 @@ Current partial traceability is in `docs/business/SOURCE_TRACEABILITY.md` and ch
 | 6604 | Project membership changes take effect correctly for project-summary reads | IMPLEMENTED AND VERIFIED | Targeted API and Chromium grant/revoke tests in `docs/quality/CHECKPOINT_VIEWER_ADMIN.md`; already-rendered data requires refresh. Other membership types remain unimplemented and unclassified. |
 
 This table is not the complete ledger. Unimplemented Release 1 obligations are not automatically organizational approvals, external blockers, or approved later releases; they remain explicitly unclassified until a truthful classification and evidence are available.
+
+### Account access slice (partial)
+
+| ID | Description and purpose | Responsible module / dependencies | Status | Test status and evidence | Release / blocker |
+|---|---|---|---|---|---|
+| SEC-SESSION-REVOKE-01 | Disable an account and invalidate its existing sessions, preventing old tokens from reviving after re-enable | API identity, PostgreSQL migration 011 | IMPLEMENTED AND VERIFIED | API integration and Chromium, `docs/quality/CHECKPOINT_ACCOUNT_REVOCATION.md` | Release 1; in-flight requests may finish; account UI and production identity remain incomplete |
+| SEC-DEFAULT-ROLE-01 | Prevent newly inserted users from defaulting to admin | Users schema, migration 011, explicit demo seed | IMPLEMENTED AND VERIFIED | Upgrade/default tests, `docs/quality/CHECKPOINT_ACCOUNT_REVOCATION.md` | Release 1; broader identity provisioning and granular authorization remain incomplete |
+
+The preceding five-status wording is superseded by the user's six-status vocabulary: IMPLEMENTED AND VERIFIED; IMPLEMENTED, NOT VERIFIED; APPROVED FUTURE RELEASE; BLOCKED BY EXTERNAL DEPENDENCY; PENDING ORGANIZATIONAL APPROVAL; NOT IMPLEMENTED. Source inventory review and the full 1,000+ catalogue remain unfinished.

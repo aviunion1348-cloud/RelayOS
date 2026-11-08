@@ -12,7 +12,7 @@ test.beforeEach(async()=>{
  const id=randomUUID(),org=randomUUID(),email=`e2e-${randomUUID()}@example.test`,salt=randomBytes(16).toString('hex');
  const hash=`${salt}:${scryptSync(password,salt,64).toString('hex')}`;
  await pool.query('INSERT INTO organizations(id,name) VALUES($1,$2)',[org,'E2E synthetic workspace']);
- await pool.query('INSERT INTO users(id,email,password_hash,organization_id) VALUES($1,$2,$3,$4)',[id,email,hash,org]);
+ await pool.query("INSERT INTO users(id,email,password_hash,organization_id,role) VALUES($1,$2,$3,$4,'admin')",[id,email,hash,org]);
  user={id,org,email};
 });
 test.afterAll(async()=>{await pool.end();});
@@ -82,4 +82,14 @@ test('viewer project access is scoped and revocation takes effect in an existing
  await open(page,'Projects');await page.getByRole('button',{name:'Grant viewer access'}).click();await page.locator('select[name=projectId]').selectOption({label:'E2E Project'});await page.locator('select[name=userId]').selectOption({label:viewerEmail});await save(page,'view-members');await expect(page.getByText(viewerEmail,{exact:true})).toBeVisible();expect(await view()).toBe(200);await viewerPage.getByRole('button',{name:'Refresh access'}).click();await expect(viewerPage.getByText('E2E Project',{exact:true})).toBeVisible();await expect(viewerPage.getByText('Unshared project',{exact:true})).toHaveCount(0);expect(await viewerPage.evaluate(async id=>(await fetch('/api/project-view/'+id)).status,otherProject)).toBe(403);const {default:AxeBuilder}=await import('@axe-core/playwright');const accessibility=await new AxeBuilder({page:viewerPage}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();expect(accessibility.violations.map(v=>v.id)).toEqual([]);
  const denied=await viewerPage.evaluate(async project=>(await fetch('/api/projects/'+project+'/view-members',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userId:'any'})})).status,project);expect(denied).toBe(403);
  await page.getByRole('button',{name:`Revoke ${viewerEmail} access to E2E Project`}).click();await expect(page.getByText(viewerEmail,{exact:true})).toHaveCount(0);expect(await view()).toBe(403);await viewerPage.getByRole('button',{name:'Refresh access'}).click();await expect(viewerPage.getByText('No shared projects')).toBeVisible();await viewerPage.getByRole('button',{name:'Sign out'}).click();await expect(viewerPage.getByRole('heading',{name:'Welcome back.'})).toBeVisible();await viewerContext.close();
+});
+
+test('disabled account loses browser session and cannot sign in until re-enabled',async({page,context})=>{
+ const id=randomUUID(),email=`disabled-${randomUUID()}@example.test`,salt=randomBytes(16).toString('hex');
+ await pool.query('INSERT INTO users(id,email,password_hash,organization_id,role) VALUES($1,$2,$3,$4,$5)',[id,email,`${salt}:${scryptSync(password,salt,64).toString('hex')}`,user.org,'viewer']);
+ await login(page);const viewerContext=await context.browser()!.newContext();const viewer=await viewerContext.newPage();await viewer.goto('/');await viewer.getByLabel('Email').fill(email);await viewer.getByLabel('Password').fill(password);await viewer.getByRole('button',{name:/Sign in/}).click();await expect(viewer.getByRole('heading',{name:'Your projects'})).toBeVisible();
+ expect(await viewer.evaluate(async id=>(await fetch('/api/users/'+id+'/disable',{method:'POST'})).status,user.id)).toBe(403);
+ expect(await page.evaluate(async id=>(await fetch('/api/users/'+id+'/disable',{method:'POST'})).status,id)).toBe(201);
+ expect(await viewer.evaluate(async()=>(await fetch('/api/my-project-views')).status)).toBe(401);await viewer.getByRole('button',{name:'Refresh access'}).click();await expect(viewer.getByRole('heading',{name:'Welcome back.'})).toBeVisible();await viewer.getByLabel('Email').fill(email);await viewer.getByLabel('Password').fill(password);await viewer.getByRole('button',{name:/Sign in/}).click();await expect(viewer.locator('p[role=alert]')).toContainText('Invalid credentials');
+ expect(await page.evaluate(async id=>(await fetch('/api/users/'+id+'/enable',{method:'POST'})).status,id)).toBe(201);expect(await viewer.evaluate(async()=>(await fetch('/api/my-project-views')).status)).toBe(401);await viewer.getByRole('button',{name:/Sign in/}).click();await expect(viewer.getByRole('heading',{name:'Your projects'})).toBeVisible();await viewerContext.close();
 });

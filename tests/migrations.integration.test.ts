@@ -12,12 +12,12 @@ test('additive migration upgrades a 001 database without altering existing recor
   await client.query(`CREATE SCHEMA "${schema}"`);await client.query(`SET search_path TO "${schema}"`);
   await client.query(readFileSync('db/migrations/001_init.sql','utf8'));
   await client.query('CREATE TABLE schema_migrations(name text PRIMARY KEY)');await client.query("INSERT INTO schema_migrations VALUES('001_init')");
-  await client.query("INSERT INTO organizations(id,name) VALUES('original','Existing workspace')");
+  await client.query("INSERT INTO organizations(id,name) VALUES('original','Existing workspace')");await client.query("INSERT INTO users(id,email,password_hash,organization_id) VALUES('legacy','legacy@example.test','hash','original')");
   const env={...process.env,DATABASE_URL:url,PGOPTIONS:`-c search_path=${schema}`};
   execFileSync('./node_modules/.bin/tsx',['db/migrate.ts'],{env,stdio:'pipe'});
   execFileSync('./node_modules/.bin/tsx',['db/migrate.ts'],{env,stdio:'pipe'});
   assert.equal((await client.query("SELECT name FROM organizations WHERE id='original'")).rows[0].name,'Existing workspace');
-  assert.deepEqual((await client.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(r=>r.name),['001_init','002_sessions','003_consultations','004_delivery_planning','005_task_dependencies','006_task_ownership','007_task_versions','008_quality_cases','009_project_view_membership','010_audit_target']);
-  assert.equal((await client.query('SELECT count(*)::int AS count FROM user_sessions')).rows[0].count,0);
+  assert.deepEqual((await client.query('SELECT name FROM schema_migrations ORDER BY name')).rows.map(r=>r.name),['001_init','002_sessions','003_consultations','004_delivery_planning','005_task_dependencies','006_task_ownership','007_task_versions','008_quality_cases','009_project_view_membership','010_audit_target','011_user_access_state']);
+  assert.equal((await client.query('SELECT count(*)::int AS count FROM user_sessions')).rows[0].count,0);assert.deepEqual((await client.query("SELECT role,is_active FROM users WHERE id='legacy'")).rows[0],{role:'admin',is_active:true});
  } finally {client.release();await pool.end();}
 });
