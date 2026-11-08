@@ -5,3 +5,12 @@
 The requested final categories are IMPLEMENTED AND VERIFIED, IMPLEMENTED, NOT YET VERIFIED, ROADMAP / APPROVED LATER RELEASE, BLOCKED BY A SPECIFIC EXTERNAL DEPENDENCY, and PENDING ORGANIZATIONAL APPROVAL. Existing in-progress Release 1 work must not be mislabeled as a later-release approval or an external blocker. The ledger cannot be called complete until all requirements are reviewed, classified with reasons, and linked to code/tests or specific blockers.
 
 Current partial traceability is in `docs/business/SOURCE_TRACEABILITY.md` and checkpoint reports in `docs/quality/`. See `docs/BUILD_STATE.md` for current work and `docs/BLOCKERS.md` for known blockers. The feature/control atlases and manager evidence pack remain incomplete; this source inventory is not a substitute for them.
+
+## Classified, narrowly scoped obligations (partial review)
+
+| Directive source | Obligation | Classification | Evidence / limitation |
+|---|---|---|---|
+| 6587 | A hidden UI component is not access control | IMPLEMENTED AND VERIFIED | Backend independently enforces the project-summary membership slice; `docs/quality/CHECKPOINT_PROJECT_VIEW.md` and `CHECKPOINT_VIEWER_ADMIN.md`. This does not claim every future resource is implemented or secured. |
+| 6604 | Project membership changes take effect correctly for project-summary reads | IMPLEMENTED AND VERIFIED | Targeted API and Chromium grant/revoke tests in `docs/quality/CHECKPOINT_VIEWER_ADMIN.md`; already-rendered data requires refresh. Other membership types remain unimplemented and unclassified. |
+
+This table is not the complete ledger. Unimplemented Release 1 obligations are not automatically organizational approvals, external blockers, or approved later releases; they remain explicitly unclassified until a truthful classification and evidence are available.
